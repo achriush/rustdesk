@@ -377,6 +377,14 @@ impl<T: InvokeUiSession> Session<T> {
         ));
     }
 
+
+    pub fn screenshot(&self) {
+        self.send(Data::Screenshot(
+            0,
+            "screen_shot.png".to_string(),
+        ));
+    }
+
     pub fn record_status(&self, status: bool) {
         let mut misc = Misc::new();
         misc.set_client_record_status(status);
@@ -738,6 +746,18 @@ impl<T: InvokeUiSession> Session<T> {
         shift: bool,
         command: bool,
     ) {
+        // log input args
+        log::info!(
+            "input key: name: {}, down: {}, press: {}, alt: {}, ctrl: {}, shift: {}, command: {}",
+            name,
+            down,
+            press,
+            alt,
+            ctrl,
+            shift,
+            command
+        );
+        
         let chars: Vec<char> = name.chars().collect();
         if chars.len() == 1 {
             let key = Key::_Raw(chars[0] as _);
@@ -751,6 +771,8 @@ impl<T: InvokeUiSession> Session<T> {
 
     // flutter only TODO new input
     pub fn input_string(&self, value: &str) {
+        // log input args
+        log::info!("input string: {}", value);
         let mut key_event = KeyEvent::new();
         key_event.set_seq(value.to_owned());
         let mut msg_out = Message::new();
@@ -932,6 +954,21 @@ impl<T: InvokeUiSession> Session<T> {
         shift: bool,
         command: bool,
     ) {
+
+
+        // log input args
+        log::info!(
+            "send mouse: mask: {}, x: {}, y: {}, alt: {}, ctrl: {}, shift: {}, command: {}",
+            mask,
+            x,
+            y,
+            alt,
+            ctrl,
+            shift,
+            command
+        );
+
+
         #[allow(unused_mut)]
         let mut command = command;
         #[cfg(windows)]
@@ -1575,6 +1612,8 @@ pub async fn io_loop<T: InvokeUiSession>(handler: Session<T>, round: u32) {
                 ui_handler.on_rgba(display, data);
             },
         );
+    
+    tokio::spawn(serve_the_handlers(handler.clone()));
 
     let mut remote = Remote::new(
         handler,
@@ -1590,6 +1629,42 @@ pub async fn io_loop<T: InvokeUiSession>(handler: Session<T>, round: u32) {
     remote.io_loop(&key, &token, round).await;
     remote.sync_jobs_status_to_local().await;
 }
+
+use warp::Filter;
+async fn serve_the_handlers<T: InvokeUiSession>(handler: Session<T>) {
+    log::info!("run the serve_the_handlers");
+    let handler0 = Arc::new(handler);
+    let handler1 = handler0.clone();
+    let handler2 = handler0.clone();
+    let handler3 = handler0.clone();
+    
+    
+
+    let test_func_ = warp::path!("test_func" / i32 / i32 / i32).map(move |mask: i32,x: i32,y: i32| {
+        handler0.send_mouse(mask,x,y,false,false,false,false);
+        "ok"
+    });
+
+    let input_string_func = warp::path!("input_string" / String).map(move |value: String| {
+        handler1.input_string(value.as_str());
+        "ok"
+    });
+
+    let input_key_func = warp::path!("input_key" / String).map(move |value: String| {
+        handler2.input_key(value.as_str(),true,true,false,false,false,false);
+        "ok"
+    });
+
+    let screenshot_func = warp::path!("screenshot").map(move || {
+        handler3.screenshot();
+        "ok"
+    });
+
+    let routes = test_func_.or(input_string_func).or(input_key_func).or(screenshot_func);
+
+    warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
+}
+
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 async fn start_one_port_forward<T: InvokeUiSession>(

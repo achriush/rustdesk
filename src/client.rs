@@ -6,6 +6,9 @@ use std::{
     sync::{mpsc, Arc, Mutex, RwLock},
 };
 
+use std::time;
+use std::fs::OpenOptions;
+use std::io::Write;
 use bytes::Bytes;
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
 use cpal::{
@@ -1023,18 +1026,23 @@ pub struct VideoHandler {
     recorder: Arc<Mutex<Option<Recorder>>>,
     record: bool,
     _display: usize, // useful for debug
+    display_count: u32,// apply a count variable name count in C++ it is "int count = 0" 
+    last_display_time: time::Instant,
 }
 
 impl VideoHandler {
     /// Create a new video handler.
     pub fn new(_display: usize) -> Self {
         log::info!("new video handler for display #{_display}");
+        let last_display_time: time::Instant = time::Instant::now();
         VideoHandler {
             decoder: Decoder::new(),
             rgb: ImageRgb::new(ImageFormat::ARGB, crate::DST_STRIDE_RGBA),
             recorder: Default::default(),
             record: false,
-            _display,
+            _display: _display,
+            display_count: 0,
+            last_display_time: last_display_time,
         }
     }
 
@@ -1089,6 +1097,24 @@ impl VideoHandler {
 
         self.record = start;
     }
+
+    pub fn screenshot(&mut self, file_name: String) {
+        let mut rgba: Vec<u8> = self.rgb.raw.chunks(4)
+            .map(|bgra| vec![bgra[2], bgra[1], bgra[0], bgra[3]])
+            .flatten()
+            .collect();
+        let width = self.rgb.w;
+        let height = self.rgb.h;
+        image::save_buffer(
+            &file_name,
+            &rgba,
+            width as u32,
+            height as u32,
+            image::ColorType::Rgba8,
+        );
+        
+    }
+
 }
 
 /// Login config handler for [`Client`].
@@ -1944,6 +1970,8 @@ pub enum MediaData {
     AudioFormat(AudioFormat),
     Reset(usize),
     RecordScreen(bool, usize, i32, i32, String),
+    Screenshot(usize, String),
+
 }
 
 pub type MediaSender = mpsc::Sender<MediaData>;
@@ -2100,6 +2128,19 @@ where
                             if let Some(handler_controler) = handler_controller_map.get_mut(display)
                             {
                                 handler_controler.handler.record_screen(start, w, h, id);
+                            }
+                        }
+                    }
+                    MediaData::Screenshot(display, file_name) => {
+                        if handler_controller_map.len() == 1 {
+                            // Compatible with the sciter version(single ui session).
+                            // For the sciter version, there're no multi-ui-sessions for one connection.
+                            // The display is always 0, video_handler_controllers.len() is always 1. So we use the first video handler.
+                            handler_controller_map[0].handler.screenshot(file_name);
+                        } else {
+                            if let Some(handler_controler) = handler_controller_map.get_mut(display)
+                            {
+                                handler_controler.handler.screenshot(file_name);
                             }
                         }
                     }
@@ -2720,7 +2761,7 @@ pub trait Interface: Send + Clone + 'static + Sized {
 }
 
 /// Data used by the client interface.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Data {
     Close,
     Login((String, String, String, bool)),
@@ -2742,6 +2783,7 @@ pub enum Data {
     AddJob((i32, String, String, i32, bool, bool)),
     ResumeJob((i32, bool)),
     RecordScreen(bool, usize, i32, i32, String),
+    Screenshot(usize, String),
     ElevateDirect,
     ElevateWithLogon(String, String),
     NewVoiceCall,

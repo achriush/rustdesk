@@ -802,6 +802,9 @@ impl<T: InvokeUiSession> Remote<T> {
                     .video_sender
                     .send(MediaData::RecordScreen(start, display, w, h, id));
             }
+            Data::Screenshot(display, file_name) => {
+                let _ = self.video_sender.send(MediaData::Screenshot(display, file_name));
+            }
             Data::ElevateDirect => {
                 let mut request = ElevationRequest::new();
                 request.set_direct(true);
