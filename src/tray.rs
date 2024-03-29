@@ -18,7 +18,7 @@ pub fn make_tray() -> hbb_common::ResultType<()> {
     use tao::event_loop::{ControlFlow, EventLoopBuilder};
     use tray_icon::{
         menu::{Menu, MenuEvent, MenuItem},
-        TrayEvent, TrayIconBuilder,
+        TrayIconEvent, TrayIconBuilder,
     };
     let icon;
     #[cfg(target_os = "macos")]
@@ -57,7 +57,7 @@ pub fn make_tray() -> hbb_common::ResultType<()> {
         let rgba = image.into_raw();
         (rgba, width, height)
     };
-    let icon = tray_icon::icon::Icon::from_rgba(icon_rgba, icon_width, icon_height)
+    let icon = tray_icon::Icon::from_rgba(icon_rgba, icon_width, icon_height)
         .context("Failed to open icon")?;
 
     let event_loop = EventLoopBuilder::new().build();
@@ -92,7 +92,7 @@ pub fn make_tray() -> hbb_common::ResultType<()> {
     let _tray_icon = Arc::new(Mutex::new(_tray_icon));
 
     let menu_channel = MenuEvent::receiver();
-    let tray_channel = TrayEvent::receiver();
+    let tray_channel = TrayIconEvent::receiver();
     #[cfg(windows)]
     let (ipc_sender, ipc_receiver) = std::sync::mpsc::channel::<Data>();
     let mut docker_hiden = false;
@@ -139,8 +139,8 @@ pub fn make_tray() -> hbb_common::ResultType<()> {
             std::time::Instant::now() + std::time::Duration::from_millis(100),
         );
 
-        if let Ok(event) = menu_channel.try_recv() {
-            if event.id == quit_i.id() {
+        if let Ok(click_type) = menu_channel.try_recv() {
+            if click_type.id == quit_i.id() {
                 /* failed in windows, seems no permission to check system process
                 if !crate::check_process("--server", false) {
                     *control_flow = ControlFlow::Exit;
@@ -150,7 +150,7 @@ pub fn make_tray() -> hbb_common::ResultType<()> {
                 if !crate::platform::uninstall_service(false) {
                     *control_flow = ControlFlow::Exit;
                 }
-            } else if event.id == open_i.id() {
+            } else if click_type.id == open_i.id() {
                 open_func();
             }
         }
