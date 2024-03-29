@@ -7,7 +7,7 @@ use std::{
 };
 
 use std::time;
-use std::fs::OpenOptions;
+
 use std::io::Write;
 use bytes::Bytes;
 #[cfg(not(any(target_os = "android", target_os = "linux")))]
@@ -1099,7 +1099,7 @@ impl VideoHandler {
     }
 
     pub fn screenshot(&mut self, file_name: String) {
-        let mut rgba: Vec<u8> = self.rgb.raw.chunks(4)
+        let rgba: Vec<u8> = self.rgb.raw.chunks(4)
             .map(|bgra| vec![bgra[2], bgra[1], bgra[0], bgra[3]])
             .flatten()
             .collect();
