@@ -29,7 +29,7 @@ lazy_static = "1.4"
 confy = { git = "https://github.com/open-trade/confy" }
 dirs-next = "2.0"
 filetime = "0.2"
-sodiumoxide = "0.2"
+sodiumoxide = "0.2.7"
 regex = "1.8"
 tokio-socks = { git = "https://github.com/open-trade/tokio-socks" }
 chrono = "0.4"

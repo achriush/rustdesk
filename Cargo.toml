@@ -85,6 +85,7 @@ libloading = "0.8"
 fon = "0.6"
 zip = "0.6"
 shutdown_hooks = "0.1"
+sodiumoxide = "0.2.7"
 
 [target.'cfg(not(any(target_os = "android", target_os = "linux")))'.dependencies]
 cpal = "0.15"
